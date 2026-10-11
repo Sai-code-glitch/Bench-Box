@@ -1,52 +1,56 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  addItem,
+  cartCount,
+  cartTotal,
+  normalizeCart,
+  removeItem,
+  setQuantity,
+} from '../logic/cart';
 
 export const CartContext = createContext();
 
+const STORAGE_KEY = 'CART';
+
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
+  const loaded = useRef(false);
 
-  // Load saved cart items from AsyncStorage on first load
+  // Load the saved cart once. Older saves had one entry per tap; normalizeCart merges them.
   useEffect(() => {
-    const loadCart = async () => {
+    (async () => {
       try {
-        const saved = await AsyncStorage.getItem('CART');
-        if (saved) {
-          setCartItems(JSON.parse(saved));
-        }
+        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        if (saved) setCartItems(normalizeCart(JSON.parse(saved)));
       } catch (error) {
         console.error('Error loading cart from storage:', error);
+      } finally {
+        loaded.current = true;
       }
-    };
-
-    loadCart();
+    })();
   }, []);
 
-  // Save cart to AsyncStorage whenever it changes
+  // Save after the first load so an empty initial state never overwrites the saved cart.
   useEffect(() => {
-    const saveCart = async () => {
-      try {
-        await AsyncStorage.setItem('CART', JSON.stringify(cartItems));
-      } catch (error) {
-        console.error('Error saving cart to storage:', error);
-      }
-    };
-
-    saveCart();
+    if (!loaded.current) return;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cartItems)).catch((error) =>
+      console.error('Error saving cart to storage:', error)
+    );
   }, [cartItems]);
 
-  // Add and remove functions
-  const addToCart = (item) => {
-    setCartItems((prevItems) => [...prevItems, item]);
-  };
-
-  const removeFromCart = (id) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item.id !== id));
-  };
-
-  return (
-    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart }}>
-      {children}
-    </CartContext.Provider>
+  const value = useMemo(
+    () => ({
+      cartItems,
+      itemCount: cartCount(cartItems),
+      total: cartTotal(cartItems),
+      addToCart: (item, quantity = 1) => setCartItems((prev) => addItem(prev, item, quantity)),
+      removeFromCart: (itemOrId) => setCartItems((prev) => removeItem(prev, itemOrId)),
+      updateQuantity: (id, quantity) => setCartItems((prev) => setQuantity(prev, id, quantity)),
+      clearCart: () => setCartItems([]),
+    }),
+    [cartItems]
   );
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };

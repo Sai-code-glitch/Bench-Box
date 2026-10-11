@@ -1,47 +1,38 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import React, { useContext } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 
 import { CartProvider } from './src/context/CartContext';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { OrdersProvider } from './src/context/OrdersContext';
+import { AuthProvider } from './src/context/AuthContext';
+import { ThemeProvider, ThemeContext } from './src/context/ThemeContext';
+import AppNavigator from './src/navigation/AppNavigator';
 
-import HomeStack from './src/navigation/HomeStack';
-import CartScreen from './src/screens/CartScreen';
-import OrdersScreen from './src/screens/OrdersScreen';
-import CheckoutScreen from './src/screens/CheckoutScreen';
-import * as Animatable from 'react-native-animatable';
-
-
-
-const Tab = createBottomTabNavigator();
+function ThemedNavigation() {
+  const { colors, isDarkMode } = useContext(ThemeContext);
+  const base = isDarkMode ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.card, text: colors.text, border: colors.border },
+  };
+  return (
+    <NavigationContainer theme={navTheme}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      <AppNavigator />
+    </NavigationContainer>
+  );
+}
 
 export default function App() {
   return (
-    <CartProvider>
-      <ThemeProvider>
-        <NavigationContainer>
-          <Tab.Navigator
-            screenOptions={{
-              headerShown: false,
-              tabBarStyle: {
-                backgroundColor: '#f5f5f5',
-                borderTopWidth: 0,
-                paddingBottom: 5,
-              },
-              tabBarLabelStyle: {
-                fontSize: 14,
-                fontWeight: '600',
-              },
-              tabBarActiveTintColor: '#8b4513', // Themed color (SaddleBrown)
-              tabBarInactiveTintColor: '#777',
-            }}
-          >
-            <Tab.Screen name="Home" component={HomeStack} />
-            <Tab.Screen name="Cart" component={CartScreen} />
-            <Tab.Screen name="Orders" component={OrdersScreen} />
-          </Tab.Navigator>
-        </NavigationContainer>
-      </ThemeProvider>
-    </CartProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <OrdersProvider>
+          <CartProvider>
+            <ThemedNavigation />
+          </CartProvider>
+        </OrdersProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemeContext } from '../context/ThemeContext';
+import { formatPrice } from '../logic/cart';
 
 const SnackCard = ({ item, onAddToCart, onPress }) => {
   const { colors } = useContext(ThemeContext);
@@ -16,7 +17,7 @@ const SnackCard = ({ item, onAddToCart, onPress }) => {
 
         <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
         <Text style={[styles.tagline, { color: colors.accent }]}>{item.tagline}</Text>
-        <Text style={[styles.price, { color: colors.text }]}>{item.price}</Text>
+        <Text style={[styles.price, { color: colors.text }]}>{formatPrice(item.price)}</Text>
 
         <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={() => onAddToCart(item)}>
           <Text style={styles.buttonText}>🛒 Add to Cart</Text>
