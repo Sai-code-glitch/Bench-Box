@@ -1,0 +1,52 @@
+name: upgrade-expo-sdk
+
+# One-time job: upgrades the project to Expo SDK 57 so it opens in the current
+# Expo Go app, checks it, commits the result, then removes itself.
+on:
+  push:
+    branches: [claude/overnight-benchbox]
+    paths: [.github/workflows/upgrade-sdk.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/overnight-benchbox
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install current dependencies
+        run: npm ci
+      - name: Upgrade to Expo SDK 57
+        run: |
+          set -o pipefail
+          { npm install expo@^57.0.0 && npx expo install --fix; } 2>&1 | tee upgrade.log || {
+            echo "::error title=upgrade failed::$(tail -n 25 upgrade.log | tr '\n' ' ' | cut -c1-3500)"; exit 1; }
+      - name: Expo doctor (report only)
+        run: |
+          npx expo-doctor 2>&1 | tee doctor.log || true
+          echo "::notice title=expo-doctor::$(tail -n 20 doctor.log | tr '\n' ' ' | cut -c1-3500)"
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test.log || {
+            echo "::error title=tests failed::$(grep -E 'not ok|Error' test.log | head -n 20 | tr '\n' ' ' | cut -c1-3500)"; exit 1; }
+      - name: Bundle check
+        run: |
+          set -o pipefail
+          npx expo export --platform android --output-dir dist 2>&1 | tee bundle.log || {
+            echo "::error title=bundle failed::$(grep -iE 'error|unable|cannot|failed' bundle.log | head -n 20 | tr '\n' ' ' | cut -c1-3500)"; exit 1; }
+      - name: Commit the upgrade
+        run: |
+          echo "::notice title=versions::$(node -e "const p=require('./package.json');console.log(JSON.stringify(p.dependencies))" | cut -c1-3500)"
+          git config user.name "Sai-code-glitch"
+          git config user.email "saijagan.yalamanchili7@gmail.com"
+          git rm -q .github/workflows/upgrade-sdk.yml
+          git add package.json package-lock.json
+          git commit -m "Upgrade to Expo SDK 57 so the app opens in the current Expo Go"
+          git push origin HEAD:claude/overnight-benchbox
