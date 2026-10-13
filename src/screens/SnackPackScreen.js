@@ -1,4 +1,4 @@
-import React, { useContext, useState, useMemo } from 'react';
+import React, { useContext, useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,14 +16,25 @@ import { ThemeContext } from '../context/ThemeContext';
 import SnackCard from '../components/SnackCard';
 import snackPackData from '../data/snackPackData';
 import debounce from 'lodash.debounce';
+import PrimaryButton from '../components/PrimaryButton';
+import { formatPrice } from '../logic/cart';
 
-const SnackPackScreen = ({ navigation }) => {
-  const { addToCart } = useContext(CartContext);
+const SnackPackScreen = ({ navigation, route }) => {
+  const { addToCart, itemCount } = useContext(CartContext);
   const { colors, isDarkMode, toggleTheme } = useContext(ThemeContext);
 
   const [searchText, setSearchText] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState(route?.params?.category || 'All');
+  const [notice, setNotice] = useState('');
+  const noticeTimer = useRef(null);
+
+  // Opening from a Home category card pre-selects that category.
+  useEffect(() => {
+    if (route?.params?.category) setFilter(route.params.category);
+  }, [route?.params?.category]);
+
+  useEffect(() => () => clearTimeout(noticeTimer.current), []);
 
   const groupedByCategory = {
     Kids: snackPackData.filter((item) => item.category === 'Kids'),
@@ -33,8 +44,12 @@ const SnackPackScreen = ({ navigation }) => {
 
   const handleAddToCart = (item) => {
     addToCart(item);
-    alert(`${item.name} added to cart`);
+    setNotice(`${item.name} added to cart`);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(''), 2200);
   };
+
+  const goToCart = () => navigation.getParent()?.navigate('Cart');
 
   const debouncedSearch = useMemo(() => debounce((text) => setSearchText(text), 300), []);
 
@@ -46,7 +61,8 @@ const SnackPackScreen = ({ navigation }) => {
     );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 40 }}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>BenchBox Snack Packs</Text>
         <TouchableOpacity onPress={toggleTheme}>
@@ -75,10 +91,21 @@ const SnackPackScreen = ({ navigation }) => {
           <Picker.Item label="Elite Athletes" value="Elite Athletes" />
         </Picker>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Cart')}>
-          <Text style={[styles.cartButton, { color: colors.primary }]}>Go to Cart</Text>
+        <TouchableOpacity onPress={goToCart} accessibilityRole="button">
+          <Text style={[styles.cartButton, { color: colors.primary }]}>
+            Go to Cart{itemCount ? ` (${itemCount})` : ''}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Customize')}
+        accessibilityRole="button"
+        style={[styles.buildCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
+      >
+        <Text style={[styles.buildTitle, { color: colors.text }]}>🛠️ Build your own box</Text>
+        <Text style={{ color: colors.muted }}>Pick the sport, allergies and the exact snacks.</Text>
+      </TouchableOpacity>
 
       {Object.keys(groupedByCategory).map((category) => {
         const filteredItems = filterAndSearch(groupedByCategory[category]);
@@ -121,17 +148,30 @@ const SnackPackScreen = ({ navigation }) => {
           <Text style={[styles.modalText, { color: colors.text }]}>
             Target: {selectedItem?.category}
           </Text>
-          <Text style={[styles.modalText, { color: colors.text }]}>Price: {selectedItem?.price}</Text>
+          <Text style={[styles.modalText, { color: colors.text }]}>Price: {selectedItem ? formatPrice(selectedItem.price) : ''}</Text>
           <Text style={[styles.modalDesc, { color: colors.text }]}>
-            This performance snack pack is ideal for {selectedItem?.category.toLowerCase()}. Packed with
+            This performance snack pack is ideal for {selectedItem?.category?.toLowerCase()}. Packed with
             essential nutrients to help with recovery, energy, and focus.
           </Text>
-          <TouchableOpacity onPress={() => setSelectedItem(null)}>
+          <PrimaryButton
+            title="Add to Cart"
+            onPress={() => {
+              handleAddToCart(selectedItem);
+              setSelectedItem(null);
+            }}
+          />
+          <TouchableOpacity onPress={() => setSelectedItem(null)} accessibilityRole="button">
             <Text style={[styles.closeText, { color: colors.primary }]}>Close</Text>
           </TouchableOpacity>
         </View>
       </Modal>
     </ScrollView>
+    {notice ? (
+      <View style={[styles.notice, { backgroundColor: colors.text }]} accessibilityLiveRegion="polite" pointerEvents="none">
+        <Text style={{ color: colors.background, fontWeight: '600' }}>{notice}</Text>
+      </View>
+    ) : null}
+    </View>
   );
 };
 
@@ -183,6 +223,25 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 18,
     textAlign: 'center',
+  },
+  buildCard: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  buildTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  notice: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
 });
 
